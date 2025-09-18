@@ -1,0 +1,26 @@
+#!/bin/bash
+# Executable script for full judiciary analysis
+
+if [ $# -ne 1 ]; then
+    echo "Usage: ./judiciary <legislator_last_name>"
+    echo "Example: ./judiciary Jordan"
+    exit 1
+fi
+
+LAST_NAME="$1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "Running full judiciary analysis for $LAST_NAME..."
+cd "$SCRIPT_DIR"
+
+# Run scraping first
+python3 scrape_judiciary.py
+
+# Check if scraping was successful
+if [ $? -eq 0 ] && [ -f "scrape_judiciary.json" ]; then
+    echo "Scraping completed successfully. Generating attendance record..."
+    python3 attendance_record.py "$LAST_NAME"
+else
+    echo "Error: Scraping failed or no data file generated."
+    exit 1
+fi

@@ -1,0 +1,23 @@
+#!/bin/bash
+# Executable script for attendance record generation only
+
+if [ $# -ne 1 ]; then
+    echo "Usage: ./attendance <legislator_last_name>"
+    echo "Example: ./attendance Jordan"
+    exit 1
+fi
+
+LAST_NAME="$1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "Generating attendance record for $LAST_NAME..."
+cd "$SCRIPT_DIR"
+
+# Check if data file exists
+if [ ! -f "scrape_judiciary.json" ]; then
+    echo "Error: scrape_judiciary.json not found. Please run scraping first."
+    echo "Use: ./scrape or ./judiciary $LAST_NAME"
+    exit 1
+fi
+
+python3 attendance_record.py "$LAST_NAME"
