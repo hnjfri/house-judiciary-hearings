@@ -1,15 +1,18 @@
 # House Judiciary Committee Hearing Analysis Tool
 
-This tool scrapes House Judiciary Committee hearing transcripts from the GovInfo website and generates detailed attendance records for legislators using AI analysis.
+This tool scrapes House Judiciary Committee hearing transcripts from the GovInfo website and generates detailed attendance records for legislators using AI analysis. The tool can process **ALL hearings** in the 119th Congress with comprehensive search capabilities and resumption support.
 
-NOTE: This currently focuses on the 119th Congress, hearing URL search ranges will need to be updated to reflect other sessions. 
+**NEW**: Comprehensive mode finds and processes every hearing in the 119th Congress with batch processing and resumption capabilities. 
 
 ## Features:
-- **Web Scraping**: Automatically finds and scrapes hearing transcripts from govinfo.gov
-- **AI Analysis**: Uses Claude Sonnet 4 to extract structured information from transcripts
-- **Attendance Tracking**: Generates detailed attendance records for specific legislators
-- **Multiple Output Formats**: Saves data as both JSON and Excel files
-- **Flexible Execution**: Run via Makefile, bash scripts, or direct Python commands
+- **🔍 Comprehensive Search**: Systematically finds ALL hearings in the 119th Congress using sequential search
+- **🤖 AI Analysis**: Uses Claude Sonnet 4 to extract structured information from transcripts
+- **📊 Attendance Tracking**: Generates detailed attendance records for specific legislators
+- **📦 Batch Processing**: Processes hearings in configurable batches with progress tracking
+- **💾 Resumption Support**: Can be interrupted and resumed without losing progress
+- **📄 Multiple Output Formats**: Saves data as both JSON and Excel files
+- **⚙️ Flexible Execution**: Run via Makefile, bash scripts, or direct Python commands
+- **🎛️ Multiple Modes**: Choose between comprehensive (all hearings) or legacy (5 hearings) modes
 
 ## What it extracts:
 - Date of the hearing
@@ -48,14 +51,20 @@ There are three ways to run this tool:
 
 ### Option 1: Using Makefile (Recommended)
 
-**Full Analysis** (scrape + attendance record):
+**Full Analysis** (comprehensive scrape + attendance record):
 ```bash
 make judiciary LAST_NAME=Jordan
 ```
 
-**Scraping Only**:
+**Comprehensive Scraping** (ALL hearings - NEW DEFAULT):
 ```bash
-make scrape
+make scrape                      # Process ALL hearings in 119th Congress
+make scrape-batch BATCH_SIZE=20  # Custom batch size for processing
+```
+
+**Legacy Scraping** (5 hearings only):
+```bash
+make scrape-legacy              # Process only 5 hearings (old behavior)
 ```
 
 **Attendance Record Only** (requires existing JSON data):
@@ -79,18 +88,48 @@ make clean    # Remove generated files
 
 ### Option 3: Direct Python Execution
 
+**Comprehensive Mode** (NEW DEFAULT):
 ```bash
-python3 scrape_judiciary.py              # Scraping only
-python3 attendance_record.py Jordan      # Attendance record only
+python3 scrape_judiciary.py                    # Process ALL hearings
+python3 scrape_judiciary.py --batch-size 20    # Custom batch size
+```
+
+**Legacy Mode**:
+```bash
+python3 scrape_judiciary.py --legacy           # Process only 5 hearings
+```
+
+**Attendance Analysis**:
+```bash
+python3 attendance_record.py Jordan            # Generate attendance record
+```
+
+**Help**:
+```bash
+python3 scrape_judiciary.py --help             # Show all options
 ```
 
 ## How it works:
 
-1. **Scraping Phase**: The tool searches govinfo.gov for valid House Judiciary Committee hearing transcripts
-2. **AI Analysis**: Each transcript is analyzed by Claude Sonnet 4 to extract structured information
-3. **Data Storage**: Results are saved to `scrape_judiciary.json`
-4. **Attendance Analysis**: For a specific legislator, generates an Excel file with their attendance record
-5. **Output**: Creates both JSON data files and Excel reports
+### Comprehensive Mode (Default):
+1. **🔍 Discovery Phase**: Systematically searches hearing numbers (50000+) until 200 consecutive failures
+2. **📦 Batch Processing**: Processes found hearings in configurable batches (default: 10)
+3. **🤖 AI Analysis**: Each transcript is analyzed by Claude Sonnet 4 to extract structured information
+4. **💾 Progress Saving**: Results saved after each hearing for resumption capability
+5. **📊 Attendance Analysis**: Generates Excel reports for specific legislators
+
+### Legacy Mode:
+1. **Limited Search**: Tests every 50th number in range 50000-70000
+2. **Quick Processing**: Processes first 5 hearings found
+3. **Single Batch**: All processing in one session
+
+## Performance & Expectations:
+
+- **Discovery Phase**: ~20-30 minutes to find all hearings (0.1s delays between requests)
+- **Processing Phase**: ~3-5 seconds per hearing (includes API calls and rate limiting)
+- **Resumption**: Can interrupt (Ctrl+C) and resume later without losing progress
+- **Total Time**: Several hours for complete 119th Congress analysis
+- **API Costs**: Proportional to number of hearings processed (Claude Sonnet 4 usage)
 
 ## Output Formats
 
@@ -155,19 +194,32 @@ house-judiciary/
 
 ## Examples
 
-**Generate attendance record for Jim Jordan:**
+**Process ALL hearings and generate attendance record:**
 ```bash
 make judiciary LAST_NAME=Jordan
 ```
 
-**Just scrape hearings without generating attendance:**
+**Comprehensive scraping (all hearings):**
 ```bash
-make scrape
+make scrape                      # Process ALL hearings (may take hours)
+make scrape-batch BATCH_SIZE=5   # Smaller batches for testing
+```
+
+**Quick testing (legacy mode):**
+```bash
+make scrape-legacy              # Process only 5 hearings for testing
 ```
 
 **Generate attendance for multiple legislators:**
 ```bash
 make attendance LAST_NAME=Jordan
-make attendance LAST_NAME=Raskin
+make attendance LAST_NAME=Raskin  
 make attendance LAST_NAME=Gaetz
+```
+
+**Resumption example:**
+```bash
+make scrape                     # Start comprehensive processing
+# Press Ctrl+C to interrupt
+make scrape                     # Resume from where it left off
 ```
