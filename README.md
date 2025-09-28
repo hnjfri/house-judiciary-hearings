@@ -5,14 +5,14 @@ This tool scrapes House Judiciary Committee hearing transcripts from the GovInfo
 **NEW**: Comprehensive mode finds and processes every hearing in the 119th Congress with batch processing and resumption capabilities. 
 
 ## Features:
-- **🔍 Comprehensive Search**: Systematically finds ALL hearings in the 119th Congress using sequential search
-- **🤖 AI Analysis**: Uses Claude Sonnet 4 to extract structured information from transcripts
-- **📊 Attendance Tracking**: Generates detailed attendance records for specific legislators
-- **📦 Batch Processing**: Processes hearings in configurable batches with progress tracking
-- **💾 Resumption Support**: Can be interrupted and resumed without losing progress
-- **📄 Multiple Output Formats**: Saves data as both JSON and Excel files
-- **⚙️ Flexible Execution**: Run via Makefile, bash scripts, or direct Python commands
-- **🎛️ Multiple Modes**: Choose between comprehensive (all hearings) or legacy (5 hearings) modes
+- **Comprehensive Search**: Systematically finds ALL hearings in the 119th Congress using sequential search
+- **AI Analysis**: Uses Claude Sonnet 4 to extract structured information from transcripts
+- **Attendance Tracking**: Generates detailed attendance records for specific legislators
+- **Batch Processing**: Processes hearings in configurable batches with progress tracking
+- **Resumption Support**: Can be interrupted and resumed without losing progress
+- **Multiple Output Formats**: Saves data as both JSON and Excel files
+- **Flexible Execution**: Run via Makefile, bash scripts, or direct Python commands
+- **Multiple Modes**: Choose between comprehensive (all hearings) or legacy (5 hearings) modes
 
 ## What it extracts:
 - Date of the hearing
@@ -112,11 +112,11 @@ python3 scrape_judiciary.py --help             # Show all options
 ## How it works:
 
 ### Comprehensive Mode (Default):
-1. **🔍 Discovery Phase**: Systematically searches hearing numbers (50000+) until 200 consecutive failures
-2. **📦 Batch Processing**: Processes found hearings in configurable batches (default: 10)
-3. **🤖 AI Analysis**: Each transcript is analyzed by Claude Sonnet 4 to extract structured information
-4. **💾 Progress Saving**: Results saved after each hearing for resumption capability
-5. **📊 Attendance Analysis**: Generates Excel reports for specific legislators
+1. **Discovery Phase**: Systematically searches hearing numbers (50000+) until 200 consecutive failures
+2. **Batch Processing**: Processes found hearings in configurable batches (default: 10)
+3. **AI Analysis**: Each transcript is analyzed by Claude Sonnet 4 to extract structured information
+4. **Progress Saving**: Results saved after each hearing for resumption capability
+5. **Attendance Analysis**: Generates Excel reports for specific legislators
 
 ### Legacy Mode:
 1. **Limited Search**: Tests every 50th number in range 50000-70000
