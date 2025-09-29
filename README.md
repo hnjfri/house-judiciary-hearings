@@ -168,8 +168,8 @@ Individual legislator attendance records are saved as Excel files (e.g., `Kamlag
 
 | Hearing Date | Hearing Title | URL | Subcommittee | Attendance |
 |--------------|---------------|-----|--------------|------------|
-| 2024-03-15 | Oversight of the Department of Justice | https://... | | present |
-| 2024-03-20 | Immigration Policy Review | https://... | The Subcommittee on Immigration Integrity, Security, and Enforcement | absent |
+| 2025-02-12 | THE CENSORSHIP-INDUSTRIAL COMPLEX | https://... | | present |
+| 2025-02-25 | Immigration Policy Review | https://... | SUBCOMMITTEE ON COURTS, INTELLECTUAL PROPERTY, ARTIFICIAL INTELLIGENCE, AND THE INTERNET | present |
 
 ## Requirements
 
