@@ -58,17 +58,17 @@ class HearingTranscriptScraper:
         }
         
         payload = {
-            "query": "collection:CHRG congress:119 Judiciary",
-            "pageSize": 1000,
-            "offsetMark": "*",
-            "sorts": [
-                {
-                    "field": "dateIssued",
-                    "sortOrder": "DESC"
-                }
-            ],
-            "resultLevel": "package"
-        }
+                "query": "collection:CHRG congress:119 Judiciary",
+                "pageSize": 1000,
+                "offsetMark": "*",
+                "sorts": [
+                    {
+                        "field": "dateIssued",
+                        "sortOrder": "DESC"
+                    }
+                ],
+                "resultLevel": "package"
+            }
         
         try:
             print("Making API request to GovInfo...")
@@ -123,7 +123,7 @@ class HearingTranscriptScraper:
             valid_hearings.sort(key=lambda x: x['hearing_number'])
             
             print(f"\nGovInfo API search complete!")
-            print(f"Found {len(valid_hearings)} House Judiciary Committee hearings")
+            print(f"Found {len(valid_hearings)} hearings to validate (will filter for actual Judiciary Committee hearings)")
             
             return valid_hearings
             
@@ -238,35 +238,27 @@ class HearingTranscriptScraper:
             return ""
     
     def is_judiciary_hearing(self, text: str) -> bool:
-        """Simple check to validate if this is a Judiciary Committee hearing without using AI."""
-        text_upper = text.upper()
+        """Strict validation using exact criteria for House Judiciary Committee hearings."""
+        # Look for the required strings in the first 3000 characters
+        text_beginning = text[:3000].upper()
         
-        # Must have one of these primary indicators
-        primary_indicators = [
-            'HOUSE COMMITTEE ON THE JUDICIARY',
-            'COMMITTEE ON THE JUDICIARY',
-            'JUDICIARY COMMITTEE'
-        ]
+        # MUST have "COMMITTEE ON THE JUDICIARY" (not any other committee)
+        if "COMMITTEE ON THE JUDICIARY" not in text_beginning:
+            print(f"Debug - Not a Judiciary Committee hearing (missing 'COMMITTEE ON THE JUDICIARY')")
+            return False
         
-        # Should NOT have strong indicators of other committees
-        other_committee_indicators = [
-            'COMMITTEE ON OVERSIGHT AND ACCOUNTABILITY',
-            'COMMITTEE ON TRANSPORTATION AND INFRASTRUCTURE',
-            'COMMITTEE ON ENERGY AND COMMERCE',
-            'COMMITTEE ON FOREIGN AFFAIRS',
-            'COMMITTEE ON VETERANS\' AFFAIRS',
-            'COMMITTEE ON WAYS AND MEANS',
-            'COMMITTEE ON NATURAL RESOURCES',
-            'COMMITTEE ON HOUSE ADMINISTRATION',
-            'COMMITTEE ON HOMELAND SECURITY',
-            'COMMITTEE ON ARMED SERVICES',
-            'COMMITTEE ON FINANCIAL SERVICES'
-        ]
+        # MUST have "U.S. HOUSE OF REPRESENTATIVES"
+        if "U.S. HOUSE OF REPRESENTATIVES" not in text_beginning:
+            print(f"Debug - Missing 'U.S. HOUSE OF REPRESENTATIVES'")
+            return False
+            
+        # MUST have "ONE HUNDRED NINETEENTH CONGRESS"
+        if "ONE HUNDRED NINETEENTH CONGRESS" not in text_beginning:
+            print(f"Debug - Missing 'ONE HUNDRED NINETEENTH CONGRESS'")
+            return False
         
-        has_judiciary_content = any(indicator in text_upper for indicator in primary_indicators)
-        has_other_committee = any(indicator in text_upper for indicator in other_committee_indicators)
-        
-        return has_judiciary_content and not has_other_committee
+        print(f"Debug - Valid Judiciary Committee hearing found!")
+        return True
     
     def extract_hearing_info(self, transcript_text: str, text_url: str) -> Dict:
         """Use Claude to extract specific hearing information from transcript text."""
@@ -477,76 +469,28 @@ class HearingTranscriptScraper:
         
         return existing_data
     
-    def process_hearings(self, limit: int = 5) -> List[Dict]:
-        """Legacy method for backward compatibility - processes limited number of hearings."""
-        print(f"Processing up to {limit} hearings...")
-        
-        # Get hearing links using the API-based approach
-        all_hearings = self.find_all_hearing_urls()
-        hearing_links = all_hearings[:limit]
-        
-        if not hearing_links:
-            print("No hearing links found")
-            return []
-        
-        results = []
-        
-        for i, hearing in enumerate(hearing_links, 1):
-            print(f"\n--- Processing Hearing {i}/{len(hearing_links)} ---")
-            print(f"Title: {hearing['title']}")
-            print(f"URL: {hearing['url']}")
-            
-            # Fetch transcript text
-            transcript_text = self.fetch_transcript_text(hearing['text_url'])
-            
-            if not transcript_text:
-                print("Failed to fetch transcript text, skipping...")
-                continue
-            
-            # Extract hearing information
-            try:
-                hearing_info = self.extract_hearing_info(transcript_text, hearing['text_url'])
-                hearing_info['source_url'] = hearing['url']
-                results.append(hearing_info)
-                
-                print(f"Successfully processed hearing: {hearing_info.get('hearing_title', 'Unknown')}")
-                
-            except Exception as e:
-                print(f"Error processing hearing: {e}")
-                continue
-            
-            # Add delay between API calls to respect rate limits
-            if i < len(hearing_links):
-                print("Waiting 15 seconds before next hearing...")
-                time.sleep(15)
-        
-        return results
 
 def main():
     """Main execution function with command-line options."""
     import sys
     
     # Check for command-line arguments
-    mode = "comprehensive"  # Default to comprehensive mode
     batch_size = 3
     
     if len(sys.argv) > 1:
-        if sys.argv[1] == "--legacy" or sys.argv[1] == "-l":
-            mode = "legacy"
-        elif sys.argv[1] == "--batch-size" or sys.argv[1] == "-b":
+        if sys.argv[1] == "--batch-size" or sys.argv[1] == "-b":
             if len(sys.argv) > 2:
                 try:
                     batch_size = int(sys.argv[2])
                 except ValueError:
-                    print("Invalid batch size. Using default of 10.")
+                    print("Invalid batch size. Using default of 3.")
         elif sys.argv[1] == "--help" or sys.argv[1] == "-h":
             print("House Judiciary Committee Hearing Scraper")
             print("\nUsage:")
-            print("  python3 scrape_judiciary.py                    # Process ALL hearings (comprehensive mode)")
-            print("  python3 scrape_judiciary.py --legacy           # Process only 5 hearings (legacy mode)")
+            print("  python3 scrape_judiciary.py                    # Process ALL hearings")
             print("  python3 scrape_judiciary.py --batch-size 20    # Set batch size for processing")
             print("  python3 scrape_judiciary.py --help             # Show this help")
-            print("\nComprehensive mode will:")
+            print("\nThis tool will:")
             print("  - Find ALL hearings in the 119th Congress")
             print("  - Process them in batches with resumption capability")
             print("  - Save progress after each hearing")
@@ -559,20 +503,13 @@ def main():
         
         output_file = "/Users/hanajafari/Desktop/MB Public Affairs/SOLO PROJECTS/house-judiciary/scrape_judiciary.json"
         
-        if mode == "comprehensive":
-            print("Running in COMPREHENSIVE mode - will process ALL hearings")
-            print(f"Batch size: {batch_size}")
-            print("Tip: You can interrupt (Ctrl+C) and resume later - progress is saved!")
-            print()
-            
-            # Process all hearings with batching and resumption
-            hearing_results = scraper.process_all_hearings_batched(batch_size=batch_size, output_file=output_file)
-            
-        else:
-            print("Running in LEGACY mode - will process 5 hearings")
-            
-            # Process limited hearings (legacy behavior)
-        hearing_results = scraper.process_hearings(limit=5)
+        print("Running in COMPREHENSIVE mode - will process ALL hearings")
+        print(f"Batch size: {batch_size}")
+        print("Tip: You can interrupt (Ctrl+C) and resume later - progress is saved!")
+        print()
+        
+        # Process all hearings with batching and resumption
+        hearing_results = scraper.process_all_hearings_batched(batch_size=batch_size, output_file=output_file)
         
         if not hearing_results:
             print("No hearings were successfully processed")
