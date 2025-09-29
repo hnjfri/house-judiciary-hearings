@@ -1,13 +1,13 @@
 # House Judiciary Committee Hearing Analysis Tool
 
-This tool efficiently scrapes House Judiciary Committee hearing transcripts from the official GovInfo website and generates detailed attendance records for legislators using AI analysis. The tool processes all 28 actual Judiciary Committee hearings in the 119th Congress with optimized API usage and smart filtering.
+This tool efficiently scrapes House Judiciary Committee hearing transcripts from the official GovInfo website and generates detailed attendance records for legislators using AI analysis. The tool processes all actual Judiciary Committee hearings in the 119th Congress with optimized API usage and smart filtering.
 
 **OPTIMIZED**: Uses the free GovInfo API for hearing discovery and simple text filtering, only calling the expensive Anthropic API for final data extraction from confirmed Judiciary hearings.
 
 ## Features:
 - **Efficient Discovery**: Uses free GovInfo API with precise search queries to find only actual Judiciary Committee hearings
 - **Smart Filtering**: Simple text validation eliminates false positives without expensive AI calls
-- **Optimized AI Usage**: Anthropic API only called for final data extraction from confirmed hearings (28 calls vs 50+ previously)
+- **Optimized AI Usage**: Anthropic API only called for final data extraction from confirmed hearings 
 - **Attendance Tracking**: Generates detailed attendance records for specific legislators
 - **Batch Processing**: Processes hearings in configurable batches with progress tracking
 - **Resumption Support**: Can be interrupted and resumed without losing progress
@@ -113,13 +113,13 @@ python3 scrape_judiciary.py --help             # Show all options
 ## How it works:
 
 ### Optimized 3-Step Process:
-1. **FREE GovInfo API Discovery**: Uses official API with precise search query to find only actual Judiciary Committee hearings (~28 total)
+1. **FREE GovInfo API Discovery**: Uses official API with precise search query to find only actual Judiciary Committee hearings 
 2. **Simple Text Validation**: Basic string matching eliminates false positives without expensive AI calls
 3. **AI Extraction**: Anthropic API called ONLY for confirmed Judiciary hearings to extract structured data
 
 ### Previous vs Current Efficiency:
 - **Old Method**: 50+ API calls for mixed hearings (many false positives)
-- **New Method**: ~28 API calls for only confirmed Judiciary hearings
+- **New Method**: ~30 API calls for only confirmed Judiciary hearings
 - **Cost Savings**: ~50% reduction in expensive API usage
 - **Accuracy**: Only processes actual House Judiciary Committee hearings
 
@@ -127,8 +127,8 @@ python3 scrape_judiciary.py --help             # Show all options
 
 - **Discovery Phase**: ~30 seconds using free GovInfo API (vs 20-30 minutes previously)
 - **Processing Phase**: ~15 seconds per hearing (includes AI analysis and rate limiting)
-- **Total Time**: ~10-15 minutes for all 28 Judiciary hearings (vs several hours previously)
-- **API Costs**: Only 28 Anthropic API calls (vs 50+ previously)
+- **Total Time**: ~10-15 minutes for all Judiciary hearings (vs several hours previously)
+- **API Costs**: Only 20-30 Anthropic API calls (vs 50+ previously)
 - **Resumption**: Can interrupt (Ctrl+C) and resume later without losing progress
 
 ## Output Formats
@@ -199,7 +199,7 @@ house-judiciary/
 make judiciary LAST_NAME=Kamlager-Dove
 ```
 
-**Comprehensive scraping (all 28 Judiciary hearings):**
+**Comprehensive scraping (all Judiciary hearings):**
 ```bash
 make scrape                      # Process ALL hearings (optimized, ~15 minutes)
 make scrape-batch BATCH_SIZE=5   # Smaller batches for testing
