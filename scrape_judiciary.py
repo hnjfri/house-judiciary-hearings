@@ -58,7 +58,7 @@ class HearingTranscriptScraper:
         }
         
         payload = {
-            "query": "collection:CHRG congress:119 \"House Committee on the Judiciary\" NOT \"Committee on Transportation\" NOT \"Committee on Oversight\" NOT \"Committee on Foreign Affairs\" NOT \"Committee on Veterans\" NOT \"Committee on Energy\" NOT \"Committee on Ways and Means\" NOT \"Committee on Natural Resources\" NOT \"Committee on House Administration\" NOT \"Committee on Homeland Security\"",
+            "query": "collection:CHRG congress:119 Judiciary",
             "pageSize": 1000,
             "offsetMark": "*",
             "sorts": [
@@ -271,7 +271,7 @@ class HearingTranscriptScraper:
     def extract_hearing_info(self, transcript_text: str, text_url: str) -> Dict:
         """Use Claude to extract specific hearing information from transcript text."""
         
-        print("🤖 Using Anthropic API to extract hearing data...")
+        print("Using Anthropic API to extract hearing data...")
         
         prompt = f"""
         Please analyze this House Judiciary Committee hearing transcript and extract the following specific information:
@@ -388,10 +388,10 @@ class HearingTranscriptScraper:
             output_file = "/Users/hanajafari/Desktop/MB Public Affairs/SOLO PROJECTS/house-judiciary/scrape_judiciary.json"
         
         print("Starting comprehensive hearing analysis...")
-        print("🔍 Step 1: Using FREE GovInfo API to find Judiciary Committee hearings")
-        print("🔍 Step 2: Simple text validation (no AI)")
-        print("🤖 Step 3: AI extraction only for confirmed Judiciary hearings")
-        print("💰 This approach minimizes expensive Anthropic API calls!")
+        print("Step 1: Using FREE GovInfo API to find Judiciary Committee hearings")
+        print("Step 2: Simple text validation (no AI)")
+        print("Step 3: AI extraction only for confirmed Judiciary hearings")
+        print("This approach minimizes expensive Anthropic API calls!")
         print()
         
         # Load existing data if resuming
@@ -433,14 +433,14 @@ class HearingTranscriptScraper:
                 
                 try:
                     # Fetch transcript text
-                    print("📄 Fetching transcript text...")
+                    print("Fetching transcript text...")
                     transcript_text = self.fetch_transcript_text(hearing['text_url'])
                     
                     if not transcript_text:
-                        print("❌ Failed to fetch transcript text, skipping...")
+                        print("Failed to fetch transcript text, skipping...")
                         continue
                     
-                    print("✅ Transcript validated as Judiciary Committee hearing")
+                    print("Transcript validated as Judiciary Committee hearing")
                     
                     # Extract hearing information using AI
                     hearing_info = self.extract_hearing_info(transcript_text, hearing['text_url'])
