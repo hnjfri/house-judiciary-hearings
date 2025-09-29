@@ -15,9 +15,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 import re
 
+
 class HearingTranscriptScraper:
-    def __init__(self, api_key: Optional[str] = None):
-        """Initialize the scraper with Anthropic API key."""
+    def __init__(self, api_key: Optional[str] = None, govinfo_api_key: Optional[str] = None):
+        """Initialize the scraper with Anthropic API key and optional GovInfo API key."""
         # Load environment variables from .env file
         load_dotenv()
         
@@ -29,27 +30,126 @@ class HearingTranscriptScraper:
                 "2. Add your Anthropic API key to the .env file"
             )
         
+        # GovInfo API key for official API access
+        self.govinfo_api_key = govinfo_api_key or os.getenv('GOVINFO_API_KEY')
+        
         self.client = anthropic.Anthropic(api_key=self.api_key)
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
     
-    def find_all_hearing_urls(self) -> List[Dict]:
-        """Find ALL valid hearing URLs by testing sequential numbers."""
-        print("Searching for ALL valid hearing URLs in 119th Congress...")
+    
+    def scrape_with_govinfo_api(self) -> List[Dict]:
+        """Use the official GovInfo API to get all House Judiciary Committee hearings."""
+        if not self.govinfo_api_key:
+            print("GovInfo API key not available, falling back to number-based search...")
+            return self.find_all_hearing_urls_fallback()
+        
+        api_url = "https://api.govinfo.gov/search"
+        
+        print("Using official GovInfo API to find hearings...")
+        print("This is the fastest and most reliable method!")
+        
+        headers = {
+            'accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-Api-Key': self.govinfo_api_key
+        }
+        
+        payload = {
+            "query": "collection:CHRG congress:119 \"House Committee on the Judiciary\" NOT \"Committee on Transportation\" NOT \"Committee on Oversight\" NOT \"Committee on Foreign Affairs\" NOT \"Committee on Veterans\" NOT \"Committee on Energy\" NOT \"Committee on Ways and Means\" NOT \"Committee on Natural Resources\" NOT \"Committee on House Administration\" NOT \"Committee on Homeland Security\"",
+            "pageSize": 1000,
+            "offsetMark": "*",
+            "sorts": [
+                {
+                    "field": "dateIssued",
+                    "sortOrder": "DESC"
+                }
+            ],
+            "resultLevel": "package"
+        }
+        
+        try:
+            print("Making API request to GovInfo...")
+            response = self.session.post(api_url, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if 'results' not in data:
+                print("No results found in API response")
+                return self.find_all_hearing_urls_fallback()
+            
+            results = data['results']
+            count = data.get('count', len(results))
+            print(f"API returned {len(results)} results (total count: {count})")
+            
+            valid_hearings = []
+            found_hearing_ids = set()
+            
+            for package in results:
+                package_id = package.get('packageId', '')
+                
+                # Extract hearing number from package ID
+                match = re.search(r'CHRG-119hhrg(\d+)', package_id)
+                if match:
+                    hearing_number = int(match.group(1))
+                    hearing_id = f"{hearing_number:05d}"
+                    
+                    if hearing_id not in found_hearing_ids:
+                        found_hearing_ids.add(hearing_id)
+                        
+                        # Get title and other metadata from API response
+                        title = package.get('title', f'House Judiciary Committee Hearing {hearing_id}')
+                        date_issued = package.get('dateIssued', 'Unknown')
+                        
+                        # Construct URLs
+                        hearing_url = f"https://www.govinfo.gov/content/pkg/CHRG-119hhrg{hearing_id}"
+                        text_url = f"https://www.govinfo.gov/content/pkg/CHRG-119hhrg{hearing_id}/html/CHRG-119hhrg{hearing_id}.htm"
+                        
+                        valid_hearings.append({
+                            'title': title,
+                            'url': hearing_url,
+                            'text_url': text_url,
+                            'hearing_number': hearing_number,
+                            'date_issued': date_issued,
+                            'package_id': package_id
+                        })
+                        
+                        print(f"Found hearing: CHRG-119hhrg{hearing_id} - {title[:60]}...")
+            
+            # Sort by hearing number for consistent processing order
+            valid_hearings.sort(key=lambda x: x['hearing_number'])
+            
+            print(f"\nGovInfo API search complete!")
+            print(f"Found {len(valid_hearings)} House Judiciary Committee hearings")
+            
+            return valid_hearings
+            
+        except Exception as e:
+            print(f"Error with GovInfo API: {e}")
+            print("Falling back to number-based search method...")
+            return self.find_all_hearing_urls_fallback()
+    
+    def scrape_collection_page(self) -> List[Dict]:
+        """Scrape hearings using the GovInfo API method."""
+        return self.scrape_with_govinfo_api()
+    
+    def find_all_hearing_urls_fallback(self) -> List[Dict]:
+        """Fallback method using number-based search if collection page scraping fails."""
+        print("Using fallback number-based search method...")
         
         valid_hearings = []
-        consecutive_failures = 0
-        max_consecutive_failures = 200  # Stop after 200 consecutive failures
         
-        # Start from a reasonable lower bound for 119th Congress
-        start_num = 50000
-        current_num = start_num
+        # Based on known hearings, search from 58400 to 61000 to cover full range
+        start_num = 58400
+        end_num = 61000  # Beyond the latest known hearing (60840)
         
-        print(f"Starting search from hearing number {start_num}")
+        print(f"Starting comprehensive search from {start_num} to {end_num}")
+        print("Note: This will take ~5 minutes due to large gaps between hearing numbers")
         
-        while consecutive_failures < max_consecutive_failures:
+        for current_num in range(start_num, end_num + 1):
             # Format with leading zeros for consistency
             hearing_id = f"{current_num:05d}"
             text_url = f"https://www.govinfo.gov/content/pkg/CHRG-119hhrg{hearing_id}/html/CHRG-119hhrg{hearing_id}.htm"
@@ -62,27 +162,27 @@ class HearingTranscriptScraper:
                     'text_url': text_url,
                     'hearing_number': current_num
                 })
-                consecutive_failures = 0  # Reset counter
-                print(f"✓ Found valid hearing: CHRG-119hhrg{hearing_id} (Total found: {len(valid_hearings)})")
-            else:
-                consecutive_failures += 1
-                if consecutive_failures % 50 == 0:
-                    print(f"  Searched {consecutive_failures} consecutive numbers without finding hearings...")
+                print(f"Found valid hearing: CHRG-119hhrg{hearing_id} (Total found: {len(valid_hearings)})")
             
-            current_num += 1
+            # Progress indicator every 100 numbers
+            if (current_num - start_num + 1) % 100 == 0:
+                progress = ((current_num - start_num + 1) / (end_num - start_num + 1)) * 100
+                print(f"  Progress: {progress:.1f}% - Searched up to {hearing_id}, found {len(valid_hearings)} hearings")
             
             # Add small delay to be respectful to the server
             time.sleep(0.1)
         
-        print(f"\n🎉 Search complete! Found {len(valid_hearings)} total hearings")
-        print(f"Search ended after {consecutive_failures} consecutive failures at number {current_num}")
+        print(f"\nSearch complete! Found {len(valid_hearings)} total hearings")
+        print(f"Searched range: {start_num:05d} to {end_num:05d}")
         
         return valid_hearings
     
-    def find_hearing_urls(self, limit: int = 5) -> List[Dict]:
-        """Legacy method for backward compatibility - finds limited number of hearings."""
-        all_hearings = self.find_all_hearing_urls()
-        return all_hearings[:limit]
+    def find_all_hearing_urls(self) -> List[Dict]:
+        """Find ALL valid hearing URLs using GovInfo API (with fallback to number search)."""
+        print("Searching for ALL valid hearing URLs in 119th Congress...")
+        
+        return self.scrape_collection_page()
+    
     
     def test_url_exists(self, url: str) -> bool:
         """Test if a URL exists by making a HEAD request."""
@@ -124,8 +224,11 @@ class HearingTranscriptScraper:
             if len(text) < 1000:
                 print("Warning: Text content seems too short, might be an error page")
                 return ""
-            elif 'COMMITTEE ON THE JUDICIARY' not in text.upper():
-                print("Warning: Text doesn't appear to be a Judiciary Committee hearing")
+            
+            # Simple validation - GovInfo API should have filtered correctly
+            # Just do a basic sanity check without AI
+            if not self.is_judiciary_hearing(text):
+                print("Warning: Does not appear to be a Judiciary Committee hearing, skipping...")
                 return ""
             
             return text
@@ -134,8 +237,41 @@ class HearingTranscriptScraper:
             print(f"Error fetching transcript text: {e}")
             return ""
     
+    def is_judiciary_hearing(self, text: str) -> bool:
+        """Simple check to validate if this is a Judiciary Committee hearing without using AI."""
+        text_upper = text.upper()
+        
+        # Must have one of these primary indicators
+        primary_indicators = [
+            'HOUSE COMMITTEE ON THE JUDICIARY',
+            'COMMITTEE ON THE JUDICIARY',
+            'JUDICIARY COMMITTEE'
+        ]
+        
+        # Should NOT have strong indicators of other committees
+        other_committee_indicators = [
+            'COMMITTEE ON OVERSIGHT AND ACCOUNTABILITY',
+            'COMMITTEE ON TRANSPORTATION AND INFRASTRUCTURE',
+            'COMMITTEE ON ENERGY AND COMMERCE',
+            'COMMITTEE ON FOREIGN AFFAIRS',
+            'COMMITTEE ON VETERANS\' AFFAIRS',
+            'COMMITTEE ON WAYS AND MEANS',
+            'COMMITTEE ON NATURAL RESOURCES',
+            'COMMITTEE ON HOUSE ADMINISTRATION',
+            'COMMITTEE ON HOMELAND SECURITY',
+            'COMMITTEE ON ARMED SERVICES',
+            'COMMITTEE ON FINANCIAL SERVICES'
+        ]
+        
+        has_judiciary_content = any(indicator in text_upper for indicator in primary_indicators)
+        has_other_committee = any(indicator in text_upper for indicator in other_committee_indicators)
+        
+        return has_judiciary_content and not has_other_committee
+    
     def extract_hearing_info(self, transcript_text: str, text_url: str) -> Dict:
         """Use Claude to extract specific hearing information from transcript text."""
+        
+        print("🤖 Using Anthropic API to extract hearing data...")
         
         prompt = f"""
         Please analyze this House Judiciary Committee hearing transcript and extract the following specific information:
@@ -181,17 +317,31 @@ class HearingTranscriptScraper:
         """
 
         try:
-            response = self.client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4000,
-                temperature=0,
-                messages=[
-                    {
-                        "role": "user", 
-                        "content": prompt
-                    }
-                ]
-            )
+            # Add retry logic for rate limiting
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = self.client.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=4000,
+                        temperature=0,
+                        messages=[
+                            {
+                                "role": "user", 
+                                "content": prompt
+                            }
+                        ]
+                    )
+                    break  # Success, exit retry loop
+                    
+                except Exception as api_error:
+                    if "rate_limit_error" in str(api_error) and attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * 60  # 60, 120, 180 seconds
+                        print(f"Rate limit hit, waiting {wait_time} seconds before retry {attempt + 2}/{max_retries}...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        raise api_error
             
             # Extract JSON from response
             response_text = response.content[0].text
@@ -232,18 +382,23 @@ class HearingTranscriptScraper:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
     
-    def process_all_hearings_batched(self, batch_size: int = 10, output_file: str = None) -> List[Dict]:
+    def process_all_hearings_batched(self, batch_size: int = 3, output_file: str = None) -> List[Dict]:
         """Process ALL hearings in batches with resumption capability."""
         if output_file is None:
             output_file = "/Users/hanajafari/Desktop/MB Public Affairs/SOLO PROJECTS/house-judiciary/scrape_judiciary.json"
         
-        print("🚀 Starting comprehensive hearing analysis...")
+        print("Starting comprehensive hearing analysis...")
+        print("🔍 Step 1: Using FREE GovInfo API to find Judiciary Committee hearings")
+        print("🔍 Step 2: Simple text validation (no AI)")
+        print("🤖 Step 3: AI extraction only for confirmed Judiciary hearings")
+        print("💰 This approach minimizes expensive Anthropic API calls!")
+        print()
         
         # Load existing data if resuming
         existing_data = self.load_existing_data(output_file)
         processed_numbers = {self.extract_hearing_number(h.get('source_url', '')) for h in existing_data}
         
-        print(f"📂 Found {len(existing_data)} previously processed hearings")
+        print(f"Found {len(existing_data)} previously processed hearings")
         
         # Find all available hearings
         all_hearings = self.find_all_hearing_urls()
@@ -251,11 +406,11 @@ class HearingTranscriptScraper:
         # Filter out already processed hearings
         new_hearings = [h for h in all_hearings if h['hearing_number'] not in processed_numbers]
         
-        print(f"📋 Found {len(new_hearings)} new hearings to process")
-        print(f"📊 Total hearings available: {len(all_hearings)}")
+        print(f"Found {len(new_hearings)} new hearings to process")
+        print(f"Total hearings available: {len(all_hearings)}")
         
         if not new_hearings:
-            print("✅ All hearings already processed!")
+            print("All hearings already processed!")
             return existing_data
         
         # Process in batches
@@ -266,7 +421,7 @@ class HearingTranscriptScraper:
             end_idx = min(start_idx + batch_size, len(new_hearings))
             batch = new_hearings[start_idx:end_idx]
             
-            print(f"\n📦 Processing Batch {batch_num + 1}/{total_batches} ({len(batch)} hearings)")
+            print(f"\nProcessing Batch {batch_num + 1}/{total_batches} ({len(batch)} hearings)")
             print("=" * 60)
             
             batch_results = []
@@ -278,13 +433,16 @@ class HearingTranscriptScraper:
                 
                 try:
                     # Fetch transcript text
+                    print("📄 Fetching transcript text...")
                     transcript_text = self.fetch_transcript_text(hearing['text_url'])
                     
                     if not transcript_text:
                         print("❌ Failed to fetch transcript text, skipping...")
                         continue
                     
-                    # Extract hearing information
+                    print("✅ Transcript validated as Judiciary Committee hearing")
+                    
+                    # Extract hearing information using AI
                     hearing_info = self.extract_hearing_info(transcript_text, hearing['text_url'])
                     hearing_info['source_url'] = hearing['url']
                     hearing_info['hearing_number'] = hearing['hearing_number']
@@ -292,30 +450,30 @@ class HearingTranscriptScraper:
                     batch_results.append(hearing_info)
                     existing_data.append(hearing_info)
                     
-                    print(f"✅ Successfully processed: {hearing_info.get('hearing_title', 'Unknown')}")
+                    print(f"Successfully processed: {hearing_info.get('hearing_title', 'Unknown')}")
                     
                     # Save after each successful processing (for resumption)
                     self.save_data(existing_data, output_file)
                     
                 except Exception as e:
-                    print(f"❌ Error processing hearing {hearing['hearing_number']}: {e}")
+                    print(f"Error processing hearing {hearing['hearing_number']}: {e}")
                     continue
                 
                 # Add delay between API calls to respect rate limits
                 if i < len(batch):
-                    print("⏳ Waiting 3 seconds before next hearing...")
-                    time.sleep(3)
+                    print("Waiting 15 seconds before next hearing...")
+                    time.sleep(15)
             
-            print(f"\n✅ Completed batch {batch_num + 1}/{total_batches}")
-            print(f"📈 Progress: {len(existing_data)}/{len(all_hearings)} total hearings processed")
+            print(f"\nCompleted batch {batch_num + 1}/{total_batches}")
+            print(f"Progress: {len(existing_data)}/{len(all_hearings)} total hearings processed")
             
             # Longer delay between batches
             if batch_num < total_batches - 1:
-                print("⏳ Waiting 10 seconds before next batch...")
-                time.sleep(10)
+                print("Waiting 60 seconds before next batch...")
+                time.sleep(60)
         
-        print(f"\n🎉 All processing complete!")
-        print(f"📊 Final count: {len(existing_data)} hearings processed")
+        print(f"\nAll processing complete!")
+        print(f"Final count: {len(existing_data)} hearings processed")
         
         return existing_data
     
@@ -323,8 +481,9 @@ class HearingTranscriptScraper:
         """Legacy method for backward compatibility - processes limited number of hearings."""
         print(f"Processing up to {limit} hearings...")
         
-        # Get hearing links
-        hearing_links = self.find_hearing_urls(limit)
+        # Get hearing links using the API-based approach
+        all_hearings = self.find_all_hearing_urls()
+        hearing_links = all_hearings[:limit]
         
         if not hearing_links:
             print("No hearing links found")
@@ -358,8 +517,8 @@ class HearingTranscriptScraper:
             
             # Add delay between API calls to respect rate limits
             if i < len(hearing_links):
-                print("Waiting 2 seconds before next hearing...")
-                time.sleep(2)
+                print("Waiting 15 seconds before next hearing...")
+                time.sleep(15)
         
         return results
 
@@ -369,7 +528,7 @@ def main():
     
     # Check for command-line arguments
     mode = "comprehensive"  # Default to comprehensive mode
-    batch_size = 10
+    batch_size = 3
     
     if len(sys.argv) > 1:
         if sys.argv[1] == "--legacy" or sys.argv[1] == "-l":
@@ -401,27 +560,27 @@ def main():
         output_file = "/Users/hanajafari/Desktop/MB Public Affairs/SOLO PROJECTS/house-judiciary/scrape_judiciary.json"
         
         if mode == "comprehensive":
-            print("🚀 Running in COMPREHENSIVE mode - will process ALL hearings")
-            print(f"📦 Batch size: {batch_size}")
-            print("💡 Tip: You can interrupt (Ctrl+C) and resume later - progress is saved!")
+            print("Running in COMPREHENSIVE mode - will process ALL hearings")
+            print(f"Batch size: {batch_size}")
+            print("Tip: You can interrupt (Ctrl+C) and resume later - progress is saved!")
             print()
             
             # Process all hearings with batching and resumption
             hearing_results = scraper.process_all_hearings_batched(batch_size=batch_size, output_file=output_file)
             
         else:
-            print("🔄 Running in LEGACY mode - will process 5 hearings")
+            print("Running in LEGACY mode - will process 5 hearings")
             
             # Process limited hearings (legacy behavior)
-            hearing_results = scraper.process_hearings(limit=5)
-            
-            if not hearing_results:
-                print("No hearings were successfully processed")
-                return
-            
-            # Save results to JSON file
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(hearing_results, f, indent=2, ensure_ascii=False)
+        hearing_results = scraper.process_hearings(limit=5)
+        
+        if not hearing_results:
+            print("No hearings were successfully processed")
+            return
+        
+        # Save results to JSON file
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(hearing_results, f, indent=2, ensure_ascii=False)
         
         print(f"\n{'='*60}")
         print("SCRAPING RESULTS")
@@ -439,13 +598,13 @@ def main():
         if len(hearing_results) > 10:
             print(f"\n... and {len(hearing_results) - 10} more hearings")
         
-        print(f"\n📊 Total hearings processed: {len(hearing_results)}")
+        print(f"\nTotal hearings processed: {len(hearing_results)}")
         
     except KeyboardInterrupt:
-        print("\n\n⏹️  Processing interrupted by user")
-        print("💾 Progress has been saved - you can resume by running the script again")
+        print("\n\nProcessing interrupted by user")
+        print("Progress has been saved - you can resume by running the script again")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
